@@ -13,7 +13,7 @@ import { formatDate, getGuardLevelName, getGuardLevelColor } from "@/lib/utils"
 import { ChevronLeft, Shield, Users, History, BarChart2 } from "lucide-react"
 
 export default async function StreamerPage({ params }: { params: { roomId: string } }) {
-  const { roomId } = params
+  const { roomId } = await params
 
   try {
     // Get streamer info
