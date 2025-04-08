@@ -100,6 +100,74 @@ export async function getRuid(roomId: string): Promise<number | null> {
   }
 }
 
+// 获取主播名称的接口响应类型
+export interface AnchorInfo {
+  info: {
+    uname: string
+  }
+}
+
+// 从房间ID获取主播名称的缓存
+const unameCache: Record<string, string> = {}
+
+// 获取房间主播的用户名
+export async function getUname(roomId: string): Promise<string | null> {
+  if (!roomId) {
+    console.error("Invalid room ID")
+    return null
+  }
+
+  if (unameCache[roomId]) {
+    return unameCache[roomId]
+  }
+
+  try {
+    const cachedUname = await kv.get<string>(`uname:${roomId}`)
+    if (cachedUname) {
+      unameCache[roomId] = cachedUname
+      return cachedUname
+    }
+  } catch (error) {
+    console.error(`Error fetching cached uname for room ${roomId}:`, error)
+    // 继续从API获取
+  }
+
+  try {
+    const anchorApi = "https://api.live.bilibili.com/live_user/v1/UserInfo/get_anchor_in_room"
+    const userAgent =
+      "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/133.0.0.0 Safari/537.36 Edg/133.0.0.0"
+
+    const response = await fetch(`${anchorApi}?roomid=${roomId}`, {
+      headers: { "user-agent": userAgent },
+    })
+
+    if (!response.ok) {
+      console.error(`API error for room ${roomId}: ${response.status} ${response.statusText}`)
+      return null
+    }
+
+    const result = await response.json()
+
+    if (result.code === 0 && result.data && result.data.info && result.data.info.uname) {
+      const uname = result.data.info.uname
+      unameCache[roomId] = uname
+      try {
+        await kv.set(`uname:${roomId}`, uname, { ex: 86400 }) // 缓存24小时
+      } catch (error) {
+        console.error(`Error caching uname for room ${roomId}:`, error)
+        // 继续执行，不中断流程
+      }
+      return uname
+    }
+
+    console.error(`Invalid API response for room ${roomId}:`, result)
+    return null
+  } catch (error) {
+    console.error(`Error fetching uname for room ${roomId}:`, error)
+    return null
+  }
+}
+
 // Fetch guard data for a specific page
 export async function fetchGuardData(
   page: number,

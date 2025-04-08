@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server"
 import { getStreamers, addStreamer, removeStreamer } from "@/lib/db"
-import { getRuid } from "@/lib/bilibili"
+import { getRuid, getUname } from "@/lib/bilibili"
 import { getServerSession } from "next-auth"
 import { authOptions } from "@/lib/auth"
 
@@ -37,10 +37,15 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: "Invalid room ID or unable to fetch room information" }, { status: 400 })
     }
 
+    const uname = await getUname(roomId)
+    if (!uname) {
+      return NextResponse.json({ error: "Invalid uname or unable to fetch streamer information" }, { status: 400 })
+    }
+
     // Add the streamer
     await addStreamer({
       id: ruid.toString(),
-      name: name || `Streamer ${roomId}`,
+      name: name || uname || `Streamer ${roomId}`,
       roomId,
     })
 

@@ -35,6 +35,7 @@ export function GuardTable({ guards, showFull = false }: GuardTableProps) {
                       width={24}
                       height={24}
                       className="rounded-full"
+                      referrerPolicy="no-referrer"
                     />
                   )}
                   <span>{guard.name}</span>

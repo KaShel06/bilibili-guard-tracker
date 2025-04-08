@@ -51,6 +51,15 @@ export async function addStreamer(streamer: StreamerInfo): Promise<void> {
   if (!exists) {
     streamers.push(streamer)
     await saveStreamers(streamers)
+  } else {
+    // Update the name if the streamer already exists
+    const updatedStreamers = streamers.map((s) => {
+      if (s.roomId === streamer.roomId && streamer.name) {
+        return { ...s, name: streamer.name }
+      }
+      return s
+    })
+    await saveStreamers(updatedStreamers)
   }
 }
 
