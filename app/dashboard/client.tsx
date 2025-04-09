@@ -6,6 +6,7 @@ import type { StreamerInfo } from "@/lib/db"
 import { StreamerCard } from "@/components/streamer-card"
 import { AddStreamerForm } from "@/components/add-streamer-form"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
+import { Button } from "@/components/ui/button"
 import {
   AlertDialog,
   AlertDialogAction,
@@ -24,6 +25,7 @@ export function DashboardClient() {
   const [streamers, setStreamers] = useState<StreamerInfo[]>([])
   const [loading, setLoading] = useState(true)
   const [refreshing, setRefreshing] = useState<string | null>(null)
+  const [refreshingAll, setRefreshingAll] = useState(false)
   const [deleteDialog, setDeleteDialog] = useState<{ open: boolean; roomId: string | null }>({
     open: false,
     roomId: null,
@@ -123,6 +125,40 @@ export function DashboardClient() {
     }
   }
 
+  const handleRefreshAll = async () => {
+    try {
+      setRefreshingAll(true)
+      
+      const response = await fetch("/api/collect/all", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        }
+      })
+
+      const data = await response.json()
+
+      if (!response.ok) {
+        throw new Error(data.error || "Failed to refresh all data")
+      }
+
+      toast({
+        title: "刷新成功",
+        description: `已为 ${data.results.length} 个主播更新大航海数据`,
+      })
+
+      await fetchStreamers()
+    } catch (error) {
+      toast({
+        title: "刷新失败",
+        description: (error as Error).message,
+        variant: "destructive",
+      })
+    } finally {
+      setRefreshingAll(false)
+    }
+  }
+
   return (
     <>
       <Tabs defaultValue="streamers" className="space-y-6">
@@ -134,7 +170,23 @@ export function DashboardClient() {
         <TabsContent value="streamers" className="space-y-6">
           <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
             <div className="md:col-span-2">
-              <h2 className="text-xl font-semibold mb-4">主播列表</h2>
+              <div className="flex justify-between items-center mb-4">
+                <h2 className="text-xl font-semibold">主播列表</h2>
+                <Button 
+                  onClick={handleRefreshAll} 
+                  disabled={refreshingAll || loading || streamers.length === 0}
+                  size="sm"
+                >
+                  {refreshingAll ? (
+                    <>
+                      <Loader2 className="h-4 w-4 animate-spin mr-2" />
+                      刷新中...
+                    </>
+                  ) : (
+                    "刷新全部"
+                  )}
+                </Button>
+              </div>
               {loading ? (
                 <div className="flex items-center justify-center py-12 border rounded-md">
                   <Loader2 className="h-6 w-6 animate-spin mr-2" />

@@ -15,17 +15,14 @@ export async function GET() {
       })
     }
 
-    const results = []
-
-    // Process each streamer
-    for (const streamer of streamers) {
+    // Process each streamer in parallel
+    const processingPromises = streamers.map(async (streamer) => {
       try {
         if (!streamer || !streamer.roomId) {
-          results.push({
+          return {
             error: "Invalid streamer data",
             success: false,
-          })
-          continue
+          }
         }
 
         console.log(`Fetching data for ${streamer.name || "Unknown"} (${streamer.roomId})...`)
@@ -34,35 +31,37 @@ export async function GET() {
         const guardData = await fetchAllGuardData(streamer.roomId)
 
         if (!guardData || !Array.isArray(guardData)) {
-          results.push({
+          return {
             roomId: streamer.roomId,
             name: streamer.name,
             error: "Failed to fetch guard data",
             success: false,
-          })
-          continue
+          }
         }
 
         // Save the snapshot
         await saveGuardSnapshot(streamer.roomId, guardData)
 
-        results.push({
+        return {
           roomId: streamer.roomId,
           name: streamer.name,
           guardCount: guardData.length,
           success: true,
-        })
+        }
       } catch (error) {
         console.error(`Error processing streamer ${streamer.name || "Unknown"}:`, error)
 
-        results.push({
+        return {
           roomId: streamer.roomId,
           name: streamer.name,
           error: (error as Error).message || "Unknown error",
           success: false,
-        })
+        }
       }
-    }
+    })
+
+    // Wait for all streamers to be processed in parallel
+    const results = await Promise.all(processingPromises)
 
     return NextResponse.json({
       success: true,
