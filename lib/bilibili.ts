@@ -314,6 +314,119 @@ export async function fetchAllGuardData(roomId: string): Promise<ParsedGuardUser
   }
 }
 
+// 直播间状态接口响应类型
+export interface RoomBaseInfo {
+  room_id: number
+  uid: number
+  live_status: number // 0: 未开播, 1: 直播中, 2: 轮播中
+  title: string
+  cover: string
+  online: number
+  live_time: number
+  live_start_time: number
+}
+
+export interface RoomBaseInfoResponse {
+  code: number
+  message: string
+  data: {
+    [roomId: string]: RoomBaseInfo
+  }
+}
+
+// 检查多个房间的直播状态
+export async function checkRoomsLiveStatus(roomIds: string[]): Promise<{[roomId: string]: RoomBaseInfo}> {
+  if (!roomIds || roomIds.length === 0) {
+    return {}
+  }
+
+  try {
+    const api = "https://api.live.bilibili.com/xlive/web-room/v1/index/getRoomBaseInfo"
+    const userAgent =
+      "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/133.0.0.0 Safari/537.36 Edg/133.0.0.0"
+
+    // 构建查询参数
+    const params = new URLSearchParams();
+    params.append('req_biz', 'web_room_componet');
+    
+    // 添加多个房间ID
+    roomIds.forEach(id => {
+      params.append('room_ids', id);
+    });
+
+    const response = await fetch(`${api}?${params.toString()}`, {
+      headers: { "user-agent": userAgent },
+    })
+
+    if (!response.ok) {
+      console.error(`API error checking live status: ${response.status} ${response.statusText}`)
+      return {}
+    }
+
+    const result = await response.json() as RoomBaseInfoResponse
+
+    if (result.code === 0 && result.data) {
+      return result.data
+    }
+
+    console.error(`Invalid API response for live status check:`, result)
+    return {}
+  } catch (error) {
+    console.error(`Error checking live status:`, error)
+    return {}
+  }
+}
+
+// 缓存直播状态
+export async function cacheLiveStatus(roomsInfo: {[roomId: string]: RoomBaseInfo}): Promise<void> {
+  try {
+    // 为每个房间缓存直播状态
+    for (const [roomId, info] of Object.entries(roomsInfo)) {
+      await kv.set(`livestatus:${roomId}`, info, { ex: 600 }) // 缓存10分钟
+    }
+    
+    // 缓存最后更新时间
+    await kv.set('livestatus:lastUpdate', new Date().toISOString())
+  } catch (error) {
+    console.error('Error caching live status:', error)
+  }
+}
+
+// 获取缓存的直播状态
+export async function getCachedLiveStatus(roomId: string): Promise<RoomBaseInfo | null> {
+  try {
+    return await kv.get<RoomBaseInfo>(`livestatus:${roomId}`)
+  } catch (error) {
+    console.error(`Error getting cached live status for room ${roomId}:`, error)
+    return null
+  }
+}
+
+// 获取所有缓存的直播状态
+export async function getAllCachedLiveStatus(roomIds: string[]): Promise<{[roomId: string]: RoomBaseInfo | null}> {
+  const result: {[roomId: string]: RoomBaseInfo | null} = {}
+  
+  try {
+    // 并行获取所有房间的缓存状态
+    const promises = roomIds.map(async (roomId) => {
+      const status = await getCachedLiveStatus(roomId)
+      return { roomId, status }
+    })
+    
+    const statuses = await Promise.all(promises)
+    
+    // 构建结果对象
+    for (const { roomId, status } of statuses) {
+      result[roomId] = status
+    }
+    
+    return result
+  } catch (error) {
+    console.error('Error getting all cached live statuses:', error)
+    return result
+  }
+}
+
 // Mask UID for privacy (only show first and last 2 digits)
 export function maskUid(uid: number): string {
   const uidStr = uid.toString()
