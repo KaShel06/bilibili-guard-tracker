@@ -8,6 +8,7 @@ export interface StreamerInfo {
   roomId: string
   avatar?: string
   lastUpdated?: string
+  tags?: string[] // 添加标签数组
 }
 
 export interface GuardSnapshot {
@@ -189,5 +190,89 @@ export async function getRecentChanges(roomId: string, limit = 10): Promise<Guar
   }
 
   return changes
+}
+
+// 为主播添加标签
+export async function addTagToStreamer(roomId: string, tag: string): Promise<boolean> {
+  const streamers = await getStreamers()
+  const streamerIndex = streamers.findIndex((s) => s.roomId === roomId)
+  
+  if (streamerIndex === -1) return false
+  
+  // 确保标签数组存在
+  if (!streamers[streamerIndex].tags) {
+    streamers[streamerIndex].tags = []
+  }
+  
+  // 如果标签不存在，则添加
+  if (!streamers[streamerIndex].tags!.includes(tag)) {
+    streamers[streamerIndex].tags!.push(tag)
+    await saveStreamers(streamers)
+  }
+  
+  return true
+}
+
+// 从主播中移除标签
+export async function removeTagFromStreamer(roomId: string, tag: string): Promise<boolean> {
+  const streamers = await getStreamers()
+  const streamerIndex = streamers.findIndex((s) => s.roomId === roomId)
+  
+  if (streamerIndex === -1 || !streamers[streamerIndex].tags) return false
+  
+  // 过滤掉要移除的标签
+  streamers[streamerIndex].tags = streamers[streamerIndex].tags!.filter(t => t !== tag)
+  await saveStreamers(streamers)
+  
+  return true
+}
+
+// 获取所有可用的标签
+export async function getAllTags(): Promise<string[]> {
+  const streamers = await getStreamers()
+  const tagsSet = new Set<string>()
+  
+  streamers.forEach(streamer => {
+    if (streamer.tags && streamer.tags.length > 0) {
+      streamer.tags.forEach(tag => tagsSet.add(tag))
+    }
+  })
+  
+  return Array.from(tagsSet)
+}
+
+// 根据标签筛选主播
+export async function getStreamersByTags(tags: string[]): Promise<StreamerInfo[]> {
+  if (!tags || tags.length === 0) {
+    return getStreamers()
+  }
+  
+  const streamers = await getStreamers()
+  
+  return streamers.filter(streamer => {
+    if (!streamer.tags) return false
+    
+    // 检查主播是否包含所有指定的标签
+    return tags.every(tag => streamer.tags!.includes(tag))
+  })
+}
+
+// 获取带有标签的主播的最新数据摘要
+export async function getTaggedStreamersSummary(tags: string[]): Promise<{
+  streamer: StreamerInfo,
+  snapshot: GuardSnapshot | null
+}[]> {
+  const streamers = await getStreamersByTags(tags)
+  const result = []
+  
+  for (const streamer of streamers) {
+    const snapshot = await getLatestSnapshot(streamer.roomId)
+    result.push({
+      streamer,
+      snapshot
+    })
+  }
+  
+  return result
 }
 
