@@ -38,6 +38,7 @@ import {
 } from "@/components/ui/table"
 import { toast } from "@/components/ui/use-toast"
 import { Loader2, Tag, Filter, Eye } from "lucide-react"
+import { TagFilter } from "@/components/tag-filter"
 
 export function DashboardClient() {
   const router = useRouter()
@@ -346,55 +347,6 @@ export function DashboardClient() {
         </TabsList>
 
         <TabsContent value="streamers" className="space-y-6">
-          {/* 标签筛选部分 */}
-          <Card>
-            <CardHeader>
-              <CardTitle className="text-lg">标签筛选</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="flex flex-wrap gap-2 mb-4">
-                {allTags.map(tag => (
-                  <Badge 
-                    key={tag}
-                    variant={selectedTags.includes(tag) ? "default" : "outline"}
-                    className="cursor-pointer"
-                    onClick={() => handleTagSelect(tag)}
-                  >
-                    {tag}
-                  </Badge>
-                ))}
-                {allTags.length === 0 && <span className="text-sm text-gray-500">暂无标签</span>}
-              </div>
-              <div className="flex gap-2">
-                <Button 
-                  variant="outline" 
-                  size="sm"
-                  onClick={() => setSelectedTags([])}
-                  disabled={selectedTags.length === 0}
-                >
-                  清除筛选
-                </Button>
-                <Button 
-                  size="sm"
-                  onClick={handlePreviewData}
-                  disabled={selectedTags.length === 0 || previewLoading}
-                >
-                  {previewLoading ? (
-                    <>
-                      <Loader2 className="h-4 w-4 animate-spin mr-2" />
-                      加载中...
-                    </>
-                  ) : (
-                    <>
-                      <Eye className="h-4 w-4 mr-2" />
-                      预览数据
-                    </>
-                  )}
-                </Button>
-              </div>
-            </CardContent>
-          </Card>
-
           <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
             <div className="md:col-span-2">
               <div className="flex justify-between items-center mb-4">
@@ -427,6 +379,7 @@ export function DashboardClient() {
                   <span>加载中...</span>
                 </div>
               ) : (
+                // 在 return 语句中修改 StreamerCard 组件的使用部分
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                   {filteredStreamers.length > 0 ? (
                     filteredStreamers.map((streamer) => (
@@ -437,6 +390,7 @@ export function DashboardClient() {
                         onDelete={handleDelete}
                         onRefresh={handleRefresh}
                         onManageTags={() => openTagDialog(streamer)}
+                        isRefreshing={refreshing === streamer.roomId}
                       />
                     ))
                   ) : (
@@ -453,6 +407,19 @@ export function DashboardClient() {
             <div>
               <h2 className="text-xl font-semibold mb-4">添加主播</h2>
               <AddStreamerForm onSuccess={fetchStreamers} />
+              
+              {/* 添加标签筛选组件 */}
+              <TagFilter 
+                allTags={allTags}
+                selectedTags={selectedTags}
+                onTagSelect={handleTagSelect}
+                onClearTags={() => setSelectedTags([])}
+                onPreviewData={handlePreviewData}
+                previewLoading={previewLoading}
+                previewDialogOpen={previewDialogOpen}
+                setPreviewDialogOpen={setPreviewDialogOpen}
+                previewData={previewData}
+              />
             </div>
           </div>
         </TabsContent>
