@@ -229,16 +229,129 @@ export async function removeTagFromStreamer(roomId: string, tag: string): Promis
 
 // 获取所有可用的标签
 export async function getAllTags(): Promise<string[]> {
-  const streamers = await getStreamers()
-  const tagsSet = new Set<string>()
-  
-  streamers.forEach(streamer => {
-    if (streamer.tags && streamer.tags.length > 0) {
-      streamer.tags.forEach(tag => tagsSet.add(tag))
+  try {
+    // 首先尝试从专用标签库获取
+    const tagLibrary = await kv.get<string[]>("tag_library")
+    if (tagLibrary && Array.isArray(tagLibrary)) {
+      return tagLibrary
     }
-  })
-  
-  return Array.from(tagsSet)
+    
+    // 如果专用标签库不存在，则从主播标签中收集
+    const streamers = await getStreamers()
+    const tagsSet = new Set<string>()
+    
+    streamers.forEach(streamer => {
+      if (streamer.tags && streamer.tags.length > 0) {
+        streamer.tags.forEach(tag => tagsSet.add(tag))
+      }
+    })
+    
+    const collectedTags = Array.from(tagsSet)
+    
+    // 创建标签库以便将来使用
+    if (collectedTags.length > 0) {
+      await kv.set("tag_library", collectedTags)
+    }
+    
+    return collectedTags
+  } catch (error) {
+    console.error("Error fetching tags:", error)
+    return []
+  }
+}
+
+// 创建新标签
+export async function createTag(tag: string): Promise<boolean> {
+  try {
+    // 获取所有现有标签
+    const existingTags = await getAllTags()
+    
+    // 检查标签是否已存在
+    if (existingTags.includes(tag)) {
+      return false // 标签已存在，无需创建
+    }
+    
+    // 将新标签添加到标签库
+    const updatedTags = [...existingTags, tag]
+    await kv.set("tag_library", updatedTags)
+    
+    return true
+  } catch (error) {
+    console.error("Error creating tag:", error)
+    return false
+  }
+}
+
+// 删除标签
+export async function deleteTag(tag: string): Promise<boolean> {
+  try {
+    // 获取所有现有标签
+    const existingTags = await getAllTags()
+    
+    // 检查标签是否存在
+    if (!existingTags.includes(tag)) {
+      return false // 标签不存在，无需删除
+    }
+    
+    // 从标签库中移除标签
+    const updatedTags = existingTags.filter(t => t !== tag)
+    await kv.set("tag_library", updatedTags)
+    
+    // 从所有主播中移除该标签
+    const streamers = await getStreamers()
+    let modified = false
+    
+    const updatedStreamers = streamers.map(streamer => {
+      if (streamer.tags && streamer.tags.includes(tag)) {
+        modified = true
+        return {
+          ...streamer,
+          tags: streamer.tags.filter(t => t !== tag)
+        }
+      }
+      return streamer
+    })
+    
+    if (modified) {
+      await saveStreamers(updatedStreamers)
+    }
+    
+    return true
+  } catch (error) {
+    console.error("Error deleting tag:", error)
+    return false
+  }
+}
+
+// 批量更新主播标签
+export async function updateStreamerTags(roomId: string, tags: string[]): Promise<boolean> {
+  try {
+    const streamers = await getStreamers()
+    const streamerIndex = streamers.findIndex(s => s.roomId === roomId)
+    
+    if (streamerIndex === -1) return false
+    
+    // 获取所有现有标签
+    const existingTags = await getAllTags()
+    
+    // 检查是否有新标签需要添加到标签库
+    const newTags = tags.filter(tag => !existingTags.includes(tag))
+    
+    if (newTags.length > 0) {
+      // 将新标签添加到标签库
+      const updatedTags = [...existingTags, ...newTags]
+      await kv.set("tag_library", updatedTags)
+    }
+    
+    // 更新主播的标签
+    streamers[streamerIndex].tags = [...tags]
+    await saveStreamers(streamers)
+    
+    return true
+  } catch (error) {
+    console.error("Error updating streamer tags:", error)
+    return false
+  }
 }
 
 // 根据标签筛选主播

@@ -379,7 +379,6 @@ export function DashboardClient() {
                   <span>加载中...</span>
                 </div>
               ) : (
-                // 在 return 语句中修改 StreamerCard 组件的使用部分
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                   {filteredStreamers.length > 0 ? (
                     filteredStreamers.map((streamer) => (
@@ -389,8 +388,45 @@ export function DashboardClient() {
                         isAdmin={true}
                         onDelete={handleDelete}
                         onRefresh={handleRefresh}
-                        onManageTags={() => openTagDialog(streamer)}
+                        onManageTags={(updatedStreamer) => {
+                          // 只更新当前修改的主播信息，而不是重新获取所有主播
+                          if (updatedStreamer) {
+                            setStreamers(prev => 
+                              prev.map(s => 
+                                s.roomId === updatedStreamer.roomId ? updatedStreamer : s
+                              )
+                            );
+                          }
+                          // 仍然需要更新标签列表，以防有新标签创建
+                          fetchAllTags();
+                        }}
                         isRefreshing={refreshing === streamer.roomId}
+                        allTags={allTags}
+                        onCreateTag={async (tag) => {
+                          try {
+                            const response = await fetch("/api/tags", {
+                              method: "POST",
+                              headers: {
+                                "Content-Type": "application/json",
+                              },
+                              body: JSON.stringify({ tag }),
+                            });
+                            
+                            if (!response.ok) {
+                              throw new Error("创建标签失败");
+                            }
+                            
+                            await fetchAllTags();
+                            return true;
+                          } catch (error) {
+                            toast({
+                              title: "创建标签失败",
+                              description: (error as Error).message,
+                              variant: "destructive",
+                            });
+                            return false;
+                          }
+                        }}
                       />
                     ))
                   ) : (
@@ -419,6 +455,57 @@ export function DashboardClient() {
                 previewDialogOpen={previewDialogOpen}
                 setPreviewDialogOpen={setPreviewDialogOpen}
                 previewData={previewData}
+                isAdmin={true}
+                onCreateTag={async (tag) => {
+                  try {
+                    const response = await fetch("/api/tags", {
+                      method: "POST",
+                      headers: {
+                        "Content-Type": "application/json",
+                      },
+                      body: JSON.stringify({ tag }),
+                    });
+                    
+                    if (!response.ok) {
+                      throw new Error("创建标签失败");
+                    }
+                    
+                    await fetchAllTags();
+                    return true;
+                  } catch (error) {
+                    toast({
+                      title: "创建标签失败",
+                      description: (error as Error).message,
+                      variant: "destructive",
+                    });
+                    return false;
+                  }
+                }}
+                onDeleteTag={async (tag) => {
+                  try {
+                    const response = await fetch("/api/tags", {
+                      method: "DELETE",
+                      headers: {
+                        "Content-Type": "application/json",
+                      },
+                      body: JSON.stringify({ tag }),
+                    });
+                    
+                    if (!response.ok) {
+                      throw new Error("删除标签失败");
+                    }
+                    
+                    await fetchAllTags();
+                    return true;
+                  } catch (error) {
+                    toast({
+                      title: "删除标签失败",
+                      description: (error as Error).message,
+                      variant: "destructive",
+                    });
+                    return false;
+                  }
+                }}
               />
             </div>
           </div>
