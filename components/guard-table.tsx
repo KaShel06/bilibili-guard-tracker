@@ -19,6 +19,7 @@ export function GuardTable({ guards, showFull = false }: GuardTableProps) {
             <TableHead>用户</TableHead>
             <TableHead>等级</TableHead>
             <TableHead>牌子</TableHead>
+            <TableHead>陪伴天数</TableHead>
             {showFull && <TableHead>UID</TableHead>}
           </TableRow>
         </TableHeader>
@@ -50,6 +51,9 @@ export function GuardTable({ guards, showFull = false }: GuardTableProps) {
                 <span className="text-sm">
                   {guard.medal_name} Lv.{guard.level}
                 </span>
+              </TableCell>
+              <TableCell>
+                <span className="text-sm">{guard.accompany} 天</span>
               </TableCell>
               {showFull && <TableCell>{guard.uid}</TableCell>}
             </TableRow>
