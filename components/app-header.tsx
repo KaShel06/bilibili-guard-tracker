@@ -24,7 +24,7 @@ export function AppHeader({ navItems = [], isAdmin = false }: AppHeaderProps) {
   const defaultNavItems: NavItem[] = [
     { label: "首页", href: "/" },
     { label: "主播列表", href: "/#streamers" },
-    { label: "标签", href: "/tags" },
+    { label: "标签管理", href: "/tags" },
   ]
 
   const items = navItems.length > 0 ? navItems : defaultNavItems

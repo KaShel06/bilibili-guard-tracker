@@ -3,9 +3,8 @@
 import { useState } from "react"
 import Link from "next/link"
 import { Button } from "@/components/ui/button"
-import { Card, CardContent, CardFooter, CardHeader } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
-import { Loader2, RefreshCw, Trash, ExternalLink, Tag, Plus, X } from "lucide-react"
+import { Loader2, RefreshCw, Trash, ExternalLink, Tag, Plus } from "lucide-react"
 import { toast } from "@/components/ui/use-toast"
 import { Input } from "@/components/ui/input"
 import { Checkbox } from "@/components/ui/checkbox"
@@ -16,6 +15,7 @@ import {
   PopoverTrigger,
 } from "@/components/ui/popover"
 import type { StreamerInfo } from "@/lib/db"
+import { BaseStreamerCard, TagsDisplay } from "@/components/base-streamer-card"
 
 interface StreamerCardProps {
   streamer: StreamerInfo
@@ -30,6 +30,7 @@ interface StreamerCardProps {
   allTags?: string[] // 所有可用标签列表
   onCreateTag?: (tag: string) => Promise<boolean>
   onUpdateTags?: (streamerId: string, tags: string[]) => Promise<boolean>
+  compact?: boolean
 }
 
 export function StreamerCard({
@@ -44,7 +45,8 @@ export function StreamerCard({
   showDetailButton = true,
   allTags = [],
   onCreateTag,
-  onUpdateTags
+  onUpdateTags,
+  compact = false
 }: StreamerCardProps) {
   const [isUpdatingTags, setIsUpdatingTags] = useState(false)
   const [selectedTags, setSelectedTags] = useState<string[]>(streamer.tags || tags)
@@ -52,16 +54,6 @@ export function StreamerCard({
   const [isCreatingTag, setIsCreatingTag] = useState(false)
   const [showAddTagInput, setShowAddTagInput] = useState(false)
   const [tagManageOpen, setTagManageOpen] = useState(false)
-
-  const formattedLastUpdated = lastUpdated ? 
-    new Date(lastUpdated).toLocaleString('zh-CN', {
-      year: 'numeric',
-      month: '2-digit',
-      day: '2-digit',
-      hour: '2-digit',
-      minute: '2-digit',
-      second: '2-digit'
-    }) : null;
 
   // 处理标签选择
   const handleTagSelect = (tag: string) => {
@@ -137,165 +129,165 @@ export function StreamerCard({
     }
   }
 
-  return (
-    <Card className="overflow-hidden">
-      <CardHeader className="flex flex-row items-start justify-between p-4 pb-0">
-        <div className="flex flex-col">
-          <Link 
-            href={`/streamer/${streamer.roomId}`} 
-            className="text-lg font-semibold hover:underline"
-          >
-            {streamer.name}
-          </Link>
-          <p className="text-sm text-muted-foreground">房间号: {streamer.roomId}</p>
-          {formattedLastUpdated && (
-            <p className="text-xs text-muted-foreground mt-1">
-              更新: {formattedLastUpdated}
-            </p>
-          )}
-        </div>
-        {badge && <div>{badge}</div>}
-      </CardHeader>
-      <CardContent className="p-4 min-h-[64px]">
-        <div className="flex flex-wrap items-center gap-2">
-          {isAdmin && (
-            <Popover open={tagManageOpen} onOpenChange={setTagManageOpen}>
-              <PopoverTrigger asChild>
+  // 标签内容
+  const tagsContent = (
+    <div className="flex flex-wrap items-center gap-2">
+      {isAdmin && (
+        <Popover open={tagManageOpen} onOpenChange={setTagManageOpen}>
+          <PopoverTrigger asChild>
+            <Button
+              variant="outline"
+              size="sm"
+              className={`${compact ? 'h-6 px-1.5 text-[10px]' : 'h-7 px-2 text-xs'}`}
+            >
+              <Tag className={`${compact ? 'h-3 w-3 mr-1' : 'h-3.5 w-3.5 mr-1.5'}`} />
+              管理标签
+            </Button>
+          </PopoverTrigger>
+          <PopoverContent className="w-72 p-4">
+            <div className="space-y-4">
+              <div className="flex justify-between items-center">
+                <h4 className="font-medium text-sm">选择标签</h4>
                 <Button
-                  variant="outline"
+                  variant="ghost"
                   size="sm"
-                  className="h-7 px-2 text-xs"
+                  className={`${compact ? 'h-6 px-1.5' : 'h-7 px-2'}`}
+                  onClick={() => setShowAddTagInput(!showAddTagInput)}
                 >
-                  <Tag className="h-3.5 w-3.5 mr-1.5" />
-                  管理标签
+                  <Plus className="h-3.5 w-3.5" />
                 </Button>
-              </PopoverTrigger>
-              <PopoverContent className="w-72 p-4">
-                <div className="space-y-4">
-                  <div className="flex justify-between items-center">
-                    <h4 className="font-medium text-sm">选择标签</h4>
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      className="h-7 px-2"
-                      onClick={() => setShowAddTagInput(!showAddTagInput)}
-                    >
-                      <Plus className="h-3.5 w-3.5" />
-                    </Button>
-                  </div>
-                  
-                  {/* 添加新标签输入框 */}
-                  {showAddTagInput && (
-                    <div className="flex items-center space-x-1">
-                      <Input
-                        placeholder="输入新标签"
-                        value={newTag}
-                        onChange={(e) => setNewTag(e.target.value)}
-                        className="h-7 text-xs"
-                        onKeyDown={(e) => e.key === "Enter" && handleCreateTag()}
-                      />
-                      <Button 
-                        variant="ghost"
-                        size="sm" 
-                        className="h-7 w-7 p-0" 
-                        onClick={handleCreateTag}
-                        disabled={isCreatingTag || !newTag.trim()}
-                      >
-                        {isCreatingTag ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Plus className="h-3.5 w-3.5" />}
-                      </Button>
-                    </div>
-                  )}
-                  
-                  <div className="max-h-52 overflow-y-auto space-y-2">
-                    {allTags.length > 0 ? (
-                      allTags.map(tag => (
-                        <div key={tag} className="flex items-center space-x-2">
-                          <Checkbox 
-                            id={`tag-${streamer.roomId}-${tag}`} 
-                            checked={selectedTags.includes(tag)}
-                            onCheckedChange={() => handleTagSelect(tag)}
-                          />
-                          <Label htmlFor={`tag-${streamer.roomId}-${tag}`} className="text-sm cursor-pointer">
-                            {tag}
-                          </Label>
-                        </div>
-                      ))
-                    ) : (
-                      <div className="text-center py-2">
-                        <p className="text-xs text-muted-foreground">暂无可用标签</p>
-                      </div>
-                    )}
-                  </div>
-                  
-                  <div className="pt-2 flex justify-end">
-                    <Button 
-                      size="sm" 
-                      onClick={handleSaveTags}
-                      disabled={isUpdatingTags || JSON.stringify(selectedTags) === JSON.stringify(streamer.tags || [])}
-                    >
-                      {isUpdatingTags ? (
-                        <>
-                          <Loader2 className="h-3.5 w-3.5 animate-spin mr-1.5" />
-                          保存中
-                        </>
-                      ) : "保存"}
-                    </Button>
-                  </div>
+              </div>
+              
+              {/* 添加新标签输入框 */}
+              {showAddTagInput && (
+                <div className="flex items-center space-x-1">
+                  <Input
+                    placeholder="输入新标签"
+                    value={newTag}
+                    onChange={(e) => setNewTag(e.target.value)}
+                    className={`${compact ? 'h-6' : 'h-7'} text-xs`}
+                    onKeyDown={(e) => e.key === "Enter" && handleCreateTag()}
+                  />
+                  <Button 
+                    variant="ghost"
+                    size="sm" 
+                    className={`${compact ? 'h-6 w-6' : 'h-7 w-7'} p-0`}
+                    onClick={handleCreateTag}
+                    disabled={isCreatingTag || !newTag.trim()}
+                  >
+                    {isCreatingTag ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Plus className="h-3.5 w-3.5" />}
+                  </Button>
                 </div>
-              </PopoverContent>
-            </Popover>
-          )}
-          
-          {selectedTags && selectedTags.length > 0 ? (
-            selectedTags.map((tag) => (
-              <Badge key={tag} variant="outline" className="text-xs">
-                {tag}
-              </Badge>
-            ))
-          ) : (
-            <p className="text-xs text-muted-foreground">{isAdmin ? "点击管理标签添加标签" : "暂无标签"}</p>
-          )}
-        </div>
-      </CardContent>
-      <CardFooter className="flex justify-between p-4 pt-0">
-        <div className="flex gap-1">
-          {onRefresh && (
-            <Button 
-              variant="ghost" 
-              size="sm" 
-              onClick={onRefresh} 
-              disabled={isLoading}
-              title="刷新数据"
-            >
-              {isLoading ? (
-                <Loader2 className="h-4 w-4 animate-spin" />
-              ) : (
-                <RefreshCw className="h-4 w-4" />
               )}
-            </Button>
+              
+              <div className="max-h-52 overflow-y-auto space-y-2">
+                {allTags.length > 0 ? (
+                  allTags.map(tag => (
+                    <div key={tag} className="flex items-center space-x-2">
+                      <Checkbox 
+                        id={`tag-${streamer.roomId}-${tag}`} 
+                        checked={selectedTags.includes(tag)}
+                        onCheckedChange={() => handleTagSelect(tag)}
+                      />
+                      <Label htmlFor={`tag-${streamer.roomId}-${tag}`} className="text-sm cursor-pointer">
+                        {tag}
+                      </Label>
+                    </div>
+                  ))
+                ) : (
+                  <div className="text-center py-2">
+                    <p className="text-xs text-muted-foreground">暂无可用标签</p>
+                  </div>
+                )}
+              </div>
+              
+              <div className="pt-2 flex justify-end">
+                <Button 
+                  size="sm" 
+                  onClick={handleSaveTags}
+                  disabled={isUpdatingTags || JSON.stringify(selectedTags) === JSON.stringify(streamer.tags || [])}
+                >
+                  {isUpdatingTags ? (
+                    <>
+                      <Loader2 className="h-3.5 w-3.5 animate-spin mr-1.5" />
+                      保存中
+                    </>
+                  ) : "保存"}
+                </Button>
+              </div>
+            </div>
+          </PopoverContent>
+        </Popover>
+      )}
+      
+      <TagsDisplay 
+        tags={selectedTags} 
+        emptyText={isAdmin ? "点击管理标签添加标签" : "暂无标签"}
+        compact={compact}
+      />
+    </div>
+  )
+
+  // 顶部右侧操作按钮
+  const headerRight = (
+    <div className="flex items-center gap-1">
+      {showDetailButton && (
+        <Button variant="ghost" size="sm" asChild className={compact ? 'h-7 text-xs px-2' : ''}>
+          <Link href={`/streamer/${streamer.roomId}`}>
+            查看详情
+            <ExternalLink className={`${compact ? 'h-3 w-3 ml-1' : 'h-3.5 w-3.5 ml-1'}`} />
+          </Link>
+        </Button>
+      )}
+      {onRefresh && (
+        <Button 
+          variant="ghost" 
+          size="sm" 
+          onClick={onRefresh} 
+          disabled={isLoading}
+          title="刷新数据"
+          className={compact ? 'h-7 w-7 p-0' : ''}
+        >
+          {isLoading ? (
+            <Loader2 className={`${compact ? 'h-3.5 w-3.5' : 'h-4 w-4'} animate-spin`} />
+          ) : (
+            <RefreshCw className={`${compact ? 'h-3.5 w-3.5' : 'h-4 w-4'}`} />
           )}
-          {isAdmin && onDelete && (
-            <Button 
-              variant="ghost" 
-              size="sm" 
-              onClick={onDelete}
-              className="text-destructive hover:text-destructive/90"
-              title="删除"
-            >
-              <Trash className="h-4 w-4" />
-            </Button>
-          )}
-        </div>
-        {showDetailButton && (
-          <Button variant="outline" size="sm" asChild>
-            <Link href={`/streamer/${streamer.roomId}`}>
-              查看详情
-              <ExternalLink className="h-3.5 w-3.5 ml-1" />
-            </Link>
-          </Button>
-        )}
-      </CardFooter>
-    </Card>
+        </Button>
+      )}
+      {isAdmin && onDelete && (
+        <Button 
+          variant="ghost" 
+          size="sm" 
+          onClick={onDelete}
+          className={`text-destructive hover:text-destructive/90 ${compact ? 'h-7 w-7 p-0' : ''}`}
+          title="删除"
+        >
+          <Trash className={`${compact ? 'h-3.5 w-3.5' : 'h-4 w-4'}`} />
+        </Button>
+      )}
+    </div>
+  )
+
+  // 底部按钮
+  const footerContent = (
+    <div className="flex justify-between w-full">
+      <div className="flex gap-1">
+        {/* Refresh button moved to header */}
+      </div>
+      {badge && <div>{badge}</div>}
+    </div>
+  )
+
+  return (
+    <BaseStreamerCard 
+      streamer={streamer}
+      headerRight={headerRight}
+      footerContent={badge ? footerContent : undefined}
+      compact={compact}
+    >
+      {tagsContent}
+    </BaseStreamerCard>
   )
 }
 

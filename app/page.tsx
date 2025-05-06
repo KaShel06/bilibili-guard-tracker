@@ -20,7 +20,7 @@ export default async function Home() {
   }
 
   // 获取主播的标签
-  const streamersWithTags = streamers.slice(0, 6).map((streamer) => ({
+  const streamersWithTags = streamers.slice(0, 8).map((streamer) => ({
     ...streamer,
     tags: streamer.tags || []
   }))
@@ -127,7 +127,7 @@ export default async function Home() {
                 当前追踪的主播列表，点击查看详细数据
               </p>
             </div>
-            <div className="grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-3">
+            <div className="grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-4">
               {streamersWithTags.length > 0 ? (
                 streamersWithTags.map((streamer) => (
                   <StreamerCard 
