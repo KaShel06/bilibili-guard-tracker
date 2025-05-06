@@ -389,3 +389,152 @@ export async function getTaggedStreamersSummary(tags: string[]): Promise<{
   return result
 }
 
+// 分析特定标签下的守护重合度
+export async function analyzeTagGuardOverlap(tag: string): Promise<{
+  streamers: StreamerInfo[],
+  guardOverlap: {
+    totalUniqueGuards: number,
+    highFrequencyGuards: Array<{
+      uid: number,
+      name: string,
+      guard_level: number,
+      count: number,
+      percentage: number,
+      streamers: string[]
+    }>,
+    overlapStats: {
+      averageOverlap: number,
+      maxOverlap: number,
+      streamersWithMostOverlap: [string, string] | null
+    }
+  }
+}> {
+  // 获取带有此标签的所有主播
+  const allStreamers = await getStreamers();
+  const streamersWithTag = allStreamers.filter(s => s.tags && s.tags.includes(tag));
+  
+  if (streamersWithTag.length === 0) {
+    return {
+      streamers: [],
+      guardOverlap: {
+        totalUniqueGuards: 0,
+        highFrequencyGuards: [],
+        overlapStats: {
+          averageOverlap: 0,
+          maxOverlap: 0,
+          streamersWithMostOverlap: null
+        }
+      }
+    };
+  }
+  
+  // 获取每个主播的最新守护数据
+  const guardDataPromises = streamersWithTag.map(async (streamer) => {
+    const snapshot = await getLatestSnapshot(streamer.roomId);
+    return {
+      streamer,
+      guards: snapshot?.users || []
+    };
+  });
+  
+  const guardData = await Promise.all(guardDataPromises);
+  
+  // 统计每个用户在多少个主播那里是守护
+  const guardCount: Record<number, {
+    uid: number,
+    name: string,
+    guard_level: number,
+    count: number,
+    streamers: string[]
+  }> = {};
+  
+  let totalStreamers = 0;
+  guardData.forEach(({ streamer, guards }) => {
+    if (guards.length > 0) totalStreamers++;
+    
+    guards.forEach(guard => {
+      if (!guardCount[guard.uid]) {
+        guardCount[guard.uid] = {
+          uid: guard.uid,
+          name: guard.name,
+          guard_level: guard.guard_level,
+          count: 0,
+          streamers: []
+        };
+      }
+      
+      guardCount[guard.uid].count++;
+      guardCount[guard.uid].streamers.push(streamer.name);
+      
+      // 更新为最高等级的舰长
+      if (guard.guard_level < guardCount[guard.uid].guard_level) {
+        guardCount[guard.uid].guard_level = guard.guard_level;
+      }
+    });
+  });
+  
+  // 转换为数组并计算百分比
+  const totalUniqueGuards = Object.keys(guardCount).length;
+  const guardCountArray = Object.values(guardCount).map(g => ({
+    ...g,
+    percentage: totalStreamers > 0 ? (g.count / totalStreamers) * 100 : 0
+  }));
+  
+  // 按照重合度排序，获取高频守护
+  const highFrequencyGuards = guardCountArray
+    .filter(g => g.count > 1) // 至少在两个主播那里都是守护
+    .sort((a, b) => b.count - a.count)
+    .slice(0, 20); // 取前20名
+  
+  // 分析主播之间的守护重合度
+  let totalOverlapPairs = 0;
+  let totalOverlapCount = 0;
+  let maxOverlap = 0;
+  let streamersWithMostOverlap: [string, string] | null = null;
+  
+  // 只有当有超过1个主播时才计算重合度
+  if (guardData.length > 1) {
+    for (let i = 0; i < guardData.length; i++) {
+      const streamerA = guardData[i];
+      const guardsA = new Set(streamerA.guards.map(g => g.uid));
+      
+      for (let j = i + 1; j < guardData.length; j++) {
+        const streamerB = guardData[j];
+        const guardsB = new Set(streamerB.guards.map(g => g.uid));
+        
+        // 计算两个主播之间的守护重合数
+        let overlapCount = 0;
+        guardsA.forEach(uid => {
+          if (guardsB.has(uid)) overlapCount++;
+        });
+        
+        // 更新统计信息
+        if (overlapCount > 0) {
+          totalOverlapPairs++;
+          totalOverlapCount += overlapCount;
+          
+          if (overlapCount > maxOverlap) {
+            maxOverlap = overlapCount;
+            streamersWithMostOverlap = [streamerA.streamer.name, streamerB.streamer.name];
+          }
+        }
+      }
+    }
+  }
+  
+  const averageOverlap = totalOverlapPairs > 0 ? totalOverlapCount / totalOverlapPairs : 0;
+  
+  return {
+    streamers: streamersWithTag,
+    guardOverlap: {
+      totalUniqueGuards,
+      highFrequencyGuards,
+      overlapStats: {
+        averageOverlap,
+        maxOverlap,
+        streamersWithMostOverlap
+      }
+    }
+  };
+}
+

@@ -39,6 +39,7 @@ import {
 import { toast } from "@/components/ui/use-toast"
 import { Loader2, Tag, Filter, Eye } from "lucide-react"
 import { TagFilter } from "@/components/tag-filter"
+import { handleCreateTag, handleUpdateStreamerTags, fetchAllTags as fetchAllTagsUtil } from "@/lib/tag-utils"
 
 export function DashboardClient() {
   const router = useRouter()
@@ -385,22 +386,11 @@ export function DashboardClient() {
                       <StreamerCard
                         key={streamer.roomId}
                         streamer={streamer}
+                        lastUpdated={streamer.lastUpdated}
                         isAdmin={true}
-                        onDelete={handleDelete}
-                        onRefresh={handleRefresh}
-                        onManageTags={(updatedStreamer) => {
-                          // 只更新当前修改的主播信息，而不是重新获取所有主播
-                          if (updatedStreamer) {
-                            setStreamers(prev => 
-                              prev.map(s => 
-                                s.roomId === updatedStreamer.roomId ? updatedStreamer : s
-                              )
-                            );
-                          }
-                          // 仍然需要更新标签列表，以防有新标签创建
-                          fetchAllTags();
-                        }}
-                        isRefreshing={refreshing === streamer.roomId}
+                        onDelete={() => handleDelete(streamer.roomId)}
+                        onRefresh={() => handleRefresh(streamer.roomId)}
+                        isLoading={refreshing === streamer.roomId}
                         allTags={allTags}
                         onCreateTag={async (tag) => {
                           try {
@@ -427,11 +417,42 @@ export function DashboardClient() {
                             return false;
                           }
                         }}
+                        onUpdateTags={async (roomId, tags) => {
+                          try {
+                            const response = await fetch(`/api/streamers/${roomId}/tags/batch`, {
+                              method: "POST",
+                              headers: {
+                                "Content-Type": "application/json",
+                              },
+                              body: JSON.stringify({ tags }),
+                            });
+                            
+                            if (!response.ok) {
+                              throw new Error("更新标签失败");
+                            }
+                            
+                            // 更新主播列表，反映标签更改
+                            setStreamers(prev => 
+                              prev.map(s => 
+                                s.roomId === roomId ? { ...s, tags } : s
+                              )
+                            );
+                            await fetchAllTags();
+                            return true;
+                          } catch (error) {
+                            toast({
+                              title: "更新标签失败",
+                              description: (error as Error).message,
+                              variant: "destructive",
+                            });
+                            return false;
+                          }
+                        }}
                       />
                     ))
                   ) : (
                     <div className="col-span-full text-center py-12 border rounded-md">
-                      <p className="text-gray-500">
+                      <p className="text-muted-foreground">
                         {selectedTags.length > 0 ? "没有符合筛选条件的主播" : "暂无追踪的主播"}
                       </p>
                     </div>
@@ -483,12 +504,8 @@ export function DashboardClient() {
                 }}
                 onDeleteTag={async (tag) => {
                   try {
-                    const response = await fetch("/api/tags", {
+                    const response = await fetch(`/api/tags/${encodeURIComponent(tag)}`, {
                       method: "DELETE",
-                      headers: {
-                        "Content-Type": "application/json",
-                      },
-                      body: JSON.stringify({ tag }),
                     });
                     
                     if (!response.ok) {
@@ -496,6 +513,8 @@ export function DashboardClient() {
                     }
                     
                     await fetchAllTags();
+                    // 清除已选中但已被删除的标签
+                    setSelectedTags(prev => prev.filter(t => t !== tag));
                     return true;
                   } catch (error) {
                     toast({
