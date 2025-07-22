@@ -11,6 +11,7 @@ import { GuardChart } from "@/components/guard-chart"
 import { ChangesTable } from "@/components/changes-table"
 import { formatDate, getGuardLevelName, getGuardLevelColor } from "@/lib/utils"
 import { ChevronLeft, Shield, Users, History, BarChart2 } from "lucide-react"
+import { ExportSnapshots } from "./export-client"
 
 export default async function StreamerPage({ params }: { params: { roomId: string } }) {
   const { roomId } = await params
@@ -111,6 +112,8 @@ export default async function StreamerPage({ params }: { params: { roomId: strin
               </Badge>
             </div>
           </div>
+
+          <ExportSnapshots roomId={roomId} />
 
           <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
             <Card>
@@ -220,7 +223,7 @@ export default async function StreamerPage({ params }: { params: { roomId: strin
     console.error("Error in streamer page:", error)
     return (
       <div className="container py-12">
-        <Link href="/" className="flex items-center text-blue-600 hover:underline mb-6">
+        <Link href="/streamers" className="flex items-center text-blue-600 hover:underline mb-6">
           <ChevronLeft className="h-4 w-4 mr-1" />
           返回首页
         </Link>

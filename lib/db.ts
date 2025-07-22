@@ -1,5 +1,6 @@
 import { kv } from "@vercel/kv"
 import type { ParsedGuardUser } from "./bilibili"
+import * as XLSX from 'xlsx'
 
 // Types for our database
 export interface StreamerInfo {
@@ -176,6 +177,79 @@ export async function getHistoricalSnapshots(roomId: string, limit = 10): Promis
     console.error(`Error fetching historical snapshots for room ${roomId}:`, error)
     return []
   }
+}
+
+/**
+ * Export guard snapshots to XLSX. If details=true, include a 'Details' sheet with all users for each timestamp.
+ * @param roomId string
+ * @param limit number
+ * @param details boolean
+ * @returns Buffer (XLSX file)
+ */
+export async function exportGuardSnapshotsToXLSX(roomId: string, limit = 100, details = false): Promise<Buffer> {
+  const snapshots = await getHistoricalSnapshots(roomId, limit)
+
+  // Summary sheet
+  const summaryRows = [
+    ['timestamp', 'totalCount', 'guardLevelCount1', 'guardLevelCount2', 'guardLevelCount3']
+  ]
+  for (const snap of snapshots) {
+    summaryRows.push([
+      snap.timestamp,
+      String(snap.totalCount),
+      String(snap.guardLevelCounts[1]),
+      String(snap.guardLevelCounts[2]),
+      String(snap.guardLevelCounts[3]),
+    ])
+  }
+  const sheets: {[name: string]: XLSX.WorkSheet} = {
+    'Summary': XLSX.utils.aoa_to_sheet(summaryRows)
+  }
+
+  if (details) {
+    // Details sheet: one row per user per snapshot
+    const detailRows = [
+      [
+        'timestamp',
+        'page', // page is not tracked, so leave blank or infer if you add it in the future
+        'uid',
+        'name',
+        'face',
+        'guard_level',
+        'level',
+        'medal_name',
+        'accompany',
+        'rank',
+        'ruid'
+      ]
+    ]
+    for (const snap of snapshots) {
+      for (const user of snap.users) {
+        detailRows.push([
+          snap.timestamp,
+          '', // page info not available in current data
+          String(user.uid),
+          user.name,
+          user.face,
+          String(user.guard_level),
+          String(user.level),
+          user.medal_name,
+          String(user.accompany),
+          String(user.rank),
+          String(user.ruid)
+        ])
+      }
+    }
+    sheets['Details'] = XLSX.utils.aoa_to_sheet(detailRows)
+  }
+
+  const wb = XLSX.utils.book_new()
+  for (const [name, sheet] of Object.entries(sheets)) {
+    XLSX.utils.book_append_sheet(wb, sheet, name)
+  }
+  // Write to buffer
+  const buf = XLSX.write(wb, { type: 'buffer', bookType: 'xlsx' })
+  return buf
 }
 
 // Get recent changes for a streamer
