@@ -96,7 +96,7 @@ export default async function StreamerPage({ params }: { params: { roomId: strin
           </div>
         </header>
         <main className="flex-1 container py-6">
-          <Link href="/" className="flex items-center text-blue-600 hover:underline mb-6">
+          <Link href="/streamers" className="flex items-center text-blue-600 hover:underline mb-6">
             <ChevronLeft className="h-4 w-4 mr-1" />
             返回首页
           </Link>

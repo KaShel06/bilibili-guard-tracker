@@ -3,8 +3,8 @@ import { exportGuardSnapshotsToXLSX } from '@/lib/db'
 
 export const dynamic = 'force-dynamic'
 
-export async function GET(req: NextRequest, { params }: { params: { roomId: string } }) {
-  const roomId = params.roomId; // Changed from destructuring to direct access
+export async function GET(req: NextRequest, { params }: { params: Promise<{ roomId: string }> }) {
+  const { roomId } = await params;
   const { searchParams } = new URL(req.url)
   const details = searchParams.get('details') === 'true'
   const limit = parseInt(searchParams.get('limit') || '100', 10)

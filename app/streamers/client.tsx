@@ -207,6 +207,38 @@ export function StreamerListClient() {
     }
   }
 
+  const handleExportRoomIds = () => {
+    try {
+      const roomIds = filteredStreamers.map(s => s.roomId);
+      const json = JSON.stringify(roomIds, null, 2);
+      const blob = new Blob([json], { type: "application/json" });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = "roomIds.json";
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+      toast({
+        title: "导出成功",
+        description: "房间号已成功导出为 JSON 文件。",
+        variant: "default",
+      });
+    } catch (error) {
+      console.error("Export failed:", error);
+      toast({
+        title: "导出失败",
+        description: "导出过程中发生错误，请重试。",
+        variant: "destructive",
+      });
+    }
+  };
+  
+//   <Button onClick={handleExportRoomIds} className="mb-4">
+//   导出房间号为JSON
+// </Button>
+
   return (
     <>
       <Tabs defaultValue="streamers" className="space-y-6">

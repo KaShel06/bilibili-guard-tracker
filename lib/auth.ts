@@ -5,6 +5,15 @@ import CredentialsProvider from "next-auth/providers/credentials"
 const DEFAULT_ADMIN_USERNAME = "admin"
 const DEFAULT_ADMIN_PASSWORD = "password"
 
+// Forbid default admin credentials in production
+const isProd = process.env.NODE_ENV === "production"
+const adminUsername = process.env.ADMIN_USERNAME || (isProd ? undefined : DEFAULT_ADMIN_USERNAME)
+const adminPassword = process.env.ADMIN_PASSWORD || (isProd ? undefined : DEFAULT_ADMIN_PASSWORD)
+
+if (isProd && (!process.env.ADMIN_USERNAME || !process.env.ADMIN_PASSWORD)) {
+  throw new Error("Admin credentials must be set in production! Set ADMIN_USERNAME and ADMIN_PASSWORD environment variables.")
+}
+
 export const authOptions: NextAuthOptions = {
   providers: [
     CredentialsProvider({
@@ -14,17 +23,17 @@ export const authOptions: NextAuthOptions = {
         password: { label: "Password", type: "password" },
       },
       async authorize(credentials) {
-        // Get admin credentials from environment variables or use defaults
-        const adminUsername = process.env.ADMIN_USERNAME || DEFAULT_ADMIN_USERNAME
-        const adminPassword = process.env.ADMIN_PASSWORD || DEFAULT_ADMIN_PASSWORD
-
-        // Log warning if using default credentials
+        // Use only secure credentials in production
+        if (!adminUsername || !adminPassword) {
+          // Should never happen in production due to the check above
+          return null
+        }
+        // Log warning if using default credentials in development
         if (!process.env.ADMIN_USERNAME || !process.env.ADMIN_PASSWORD) {
           console.warn(
             "Warning: Using default admin credentials. Set ADMIN_USERNAME and ADMIN_PASSWORD environment variables for security.",
           )
         }
-
         // Check credentials
         if (credentials?.username === adminUsername && credentials?.password === adminPassword) {
           return {
@@ -47,7 +56,7 @@ export const authOptions: NextAuthOptions = {
   callbacks: {
     async session({ session, token }) {
       if (token && session.user) {
-        session.user.id = token.sub as string
+        (session.user as any).id = token.sub as string
       }
       return session
     },
